@@ -1,0 +1,23 @@
+services:
+  nginx:
+    container_name: itxryx-com-nginx
+    build:
+      context: .
+      dockerfile: ./docker/nginx/development/Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      - node
+  node:
+    container_name: itxryx-com-node
+    build:
+      context: .
+      dockerfile: ./docker/node/development/Dockerfile
+    volumes:
+      - ./:/itxryx-com
+    ports:
+      - "5173:5173"
+    expose:
+      - 3000
+    # tty: true
+    entrypoint: "/bin/sh -c 'npm run build && npm start'"
