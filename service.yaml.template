@@ -1,0 +1,44 @@
+apiVersion: serving.knative.dev/v1
+
+kind: Service
+
+metadata:
+  name: itxryx-com
+
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "1"
+        run.googleapis.com/cpu-throttling: "true"
+        run.googleapis.com/startup-cpu-boost: "false"
+        run.googleapis.com/container-dependencies: '{"itxryx-com-nginx":["itxryx-com-node"]}'
+    spec:
+      containers:
+        - name: itxryx-com-node
+          image: ${NODE_IMAGE}
+          env:
+            - name: GA_TRACKING_ID
+              value: ${GA_TRACKING_ID}
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: "128Mi"
+          startupProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 3
+            timeoutSeconds: 1
+            periodSeconds: 1
+            failureThreshold: 10
+        - name: itxryx-com-nginx
+          image: ${NGINX_IMAGE}
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          resources:
+            limits:
+              cpu: "0.5"
+              memory: "128Mi"
