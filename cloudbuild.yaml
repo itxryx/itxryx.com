@@ -1,0 +1,79 @@
+steps:
+
+  # build and push node
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - build
+      - "-f"
+      - docker/node/$_ENVIRONMENT/Dockerfile
+      - "-t"
+      - >-
+        ${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-node:$COMMIT_SHA
+      - .
+    id: build-node
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - >-
+        ${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-node:$COMMIT_SHA
+    id: push-node
+    waitFor: ["build-node"]
+
+  # build and push nginx
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - build
+      - "-f"
+      - docker/nginx/$_ENVIRONMENT/Dockerfile
+      - "-t"
+      - >-
+        ${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-nginx:$COMMIT_SHA
+      - .
+    id: build-nginx
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - >-
+        ${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-nginx:$COMMIT_SHA
+    id: push-nginx
+    waitFor: ["build-nginx"]
+
+  # generate service.yaml
+  - name: "alpine"
+    entrypoint: "sh"
+    args:
+      - "-c"
+      - |
+        apk add --no-cache gettext
+        envsubst < service.yaml.template > service.yaml
+    env:
+      - "NODE_IMAGE=${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-node:$COMMIT_SHA"
+      - "NGINX_IMAGE=${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-nginx:$COMMIT_SHA"
+      - "GA_TRACKING_ID=${_GA_TRACKING_ID}"
+    id: "generate-service-yaml"
+    waitFor: ["push-node", "push-nginx"]
+
+  # deploy
+  - name: "asia.gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "services"
+      - "replace"
+      - "service.yaml"
+      - "--region"
+      - "asia-northeast1"
+    id: "deploy-all"
+    waitFor: ["generate-service-yaml"]
+
+images: [
+  "${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-node:$COMMIT_SHA",
+  "${_ARTIFACT_REGISTRY}/${_ENVIRONMENT}-${_SERVICE_NAME}-nginx:$COMMIT_SHA",
+]
+
+substitutions:
+  _ARTIFACT_REGISTRY: "asia-northeast1-docker.pkg.dev/${PROJECT_ID}/${_SERVICE_NAME}"
+
+options:
+  dynamic_substitutions: true
+  logging: CLOUD_LOGGING_ONLY
