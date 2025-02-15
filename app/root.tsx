@@ -4,25 +4,30 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteLoaderData
 } from "@remix-run/react";
 import type { LinksFunction } from "@remix-run/node";
+import { Background } from "./Background";
 
-import "./tailwind.css";
+import "./main.css";
+
+export const loader = async () => {
+  return {
+    gaTrackingId: process.env.GA_TRACKING_ID,
+  };
+};
 
 export const links: LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
-  },
-  {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
-  },
+    rel: "icon",
+    href: "/favicon.png",
+    type: "image/png",
+  }
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const { gaTrackingId } = useRouteLoaderData<typeof loader>("root") ?? {};
+
   return (
     <html lang="en">
       <head>
@@ -30,8 +35,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        {/* Google tag (gtag.js) */}
+        <script
+            async
+            src={`https://www.googletagmanager.com/gtag/js?id=${gaTrackingId ?? "GA_TRACKING_ID"}`}
+        ></script>
+        <script
+            dangerouslySetInnerHTML={{
+              __html: `
+                window.dataLayer = window.dataLayer || [];
+                function gtag(){dataLayer.push(arguments);}
+                gtag('js', new Date());
+                gtag('config', '${gaTrackingId ?? "GA_TRACKING_ID"}');
+            `,
+            }}
+        />
       </head>
       <body>
+        <Background />
         {children}
         <ScrollRestoration />
         <Scripts />

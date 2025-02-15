@@ -41,7 +41,7 @@ export default function Index() {
                       </li>
                       <li>
                           <a
-                              href="https://www.instagram.com/itxryx"
+                              href="https://instagram.com/itxryx"
                               target="_blank"
                               rel="noopener noreferrer"
                           >

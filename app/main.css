@@ -1,0 +1,145 @@
+@import url('https://fonts.googleapis.com/css2?family=DotGothic16&family=Murecho:wght@100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+
+  color: #F8F8F8;
+  font-size: 62.5%;
+  font-family: "Murecho", sans-serif;
+  font-weight: normal;
+}
+
+.wrapper {
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 1.6rem;
+
+  @media screen and (min-width: 576px) {
+    max-width: 540px
+  }
+  @media screen and (min-width: 768px) {
+    max-width: 720px;
+  }
+  @media screen and (min-width: 1200px) {
+    max-width: 1140px;
+  }
+}
+
+main {
+  min-height: 70vh;
+  font-size: 1.6rem;
+}
+
+h1 {
+  font-size: 5rem;
+  font-weight: bold;
+}
+
+h2 {
+  font-size: 2.5rem;
+  font-weight: bold;
+}
+
+.container-header {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+  header {
+    margin: 4.0rem 0;
+  }
+}
+
+.container-footer {
+  border-top: solid 1px #F8F8F8;
+  footer {
+    margin: 4.0rem 0;
+  }
+  .footer-notice {
+    font-size: 1rem;
+  }
+  .footer-copyright {
+    text-align: center;
+    font-size: 1rem;
+  }
+}
+
+.container-profile {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+
+  .profile {
+    max-width: 296px;
+    border-radius: 50%;
+  }
+}
+
+.container-biography {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-content: center;
+  justify-content: center;
+  align-items: center;
+
+  margin: 2.4rem 0;
+}
+
+.container-social {
+  margin-bottom: 1.6rem;
+}
+
+.container-contact {
+  margin-bottom: 1.6rem;
+}
+
+canvas {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: -1;
+  background-color: #333;
+  opacity: 0.96;
+
+  /* tweak... */
+  transform: translate3d(0, 0, 0);
+  will-change: transform;
+}
+
+a {
+  color: #F8F8F8;
+  text-decoration: none;
+}
+a:link {
+  color: #F8F8F8;
+}
+a:visited {
+  color: #F8F8F8;
+}
+a:focus {
+  color: #F8F8F8;
+}
+a:hover {
+  text-decoration: line-through;
+}
+a:active {
+  color: #F8F8F8;
+}
