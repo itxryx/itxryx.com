@@ -15,5 +15,5 @@ variable "target_branch" {
 
 variable "ga_tracking_id" {
   type = string
-  default = "GA_TRACKING_ID"
+  default = "G-H0EW7RJZYE"
 }
