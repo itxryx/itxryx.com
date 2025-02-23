@@ -138,7 +138,10 @@ a:focus {
   color: #F8F8F8;
 }
 a:hover {
-  text-decoration: line-through;
+  /* line-through だと中心がズレるため */
+  text-decoration: underline;
+  text-underline-offset: -0.5rem;
+  text-decoration-skip-ink: none;
 }
 a:active {
   color: #F8F8F8;
