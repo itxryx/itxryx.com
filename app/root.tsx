@@ -7,9 +7,9 @@ import {
   useRouteLoaderData
 } from "@remix-run/react";
 import type { LinksFunction } from "@remix-run/node";
-import { Background } from "./Background";
+import { Background } from "./components/background";
 
-import "./main.css";
+import "./styles/main.css";
 
 export const loader = async () => {
   return {
