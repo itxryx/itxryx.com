@@ -15,3 +15,8 @@ variable "domain_name" {
   type        = string
   default     = "itxryx.com"
 }
+
+variable "acm_certificate_arn" {
+  description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
+  type        = string
+}

@@ -28,6 +28,35 @@ resource "aws_cloudfront_origin_access_control" "website" {
 }
 
 # =============================================================================
+# CloudFront Function (www -> non-www redirect)
+# =============================================================================
+
+resource "aws_cloudfront_function" "redirect_www" {
+  name    = "${var.project_name}-redirect-www"
+  runtime = "cloudfront-js-2.0"
+  comment = "Redirect www.${var.domain_name} to ${var.domain_name}"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var host = request.headers.host.value;
+
+      if (host === 'www.${var.domain_name}') {
+        return {
+          statusCode: 301,
+          statusDescription: 'Moved Permanently',
+          headers: {
+            location: { value: 'https://${var.domain_name}' + request.uri }
+          }
+        };
+      }
+
+      return request;
+    }
+  EOT
+}
+
+# =============================================================================
 # CloudFront Distribution
 # =============================================================================
 
@@ -36,6 +65,7 @@ resource "aws_cloudfront_distribution" "website" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
   price_class         = "PriceClass_200"
+  aliases             = [var.domain_name, "www.${var.domain_name}"]
 
   origin {
     domain_name              = aws_s3_bucket.website.bucket_regional_domain_name
@@ -54,6 +84,11 @@ resource "aws_cloudfront_distribution" "website" {
     cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6"
     # AWS Managed Origin Request Policy: CORS-S3Origin
     origin_request_policy_id = "88a5eaf4-2fd4-4709-b370-b4c650ea3fcf"
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.redirect_www.arn
+    }
   }
 
   # SPA対応: 403/404エラー時にindex.htmlを返す
@@ -76,7 +111,9 @@ resource "aws_cloudfront_distribution" "website" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = var.acm_certificate_arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 }
 
