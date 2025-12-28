@@ -1,73 +1,111 @@
-# React + TypeScript + Vite
+# itxryx.com
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Tech Stack
 
-Currently, two official plugins are available:
+- **Frontend**: React 19 + TypeScript
+- **Build Tool**: Vite 7
+- **Styling**: Tailwind CSS 4
+- **Routing**: React Router 7 (SPA mode)
+- **Analytics**: Google Analytics
+- **Infrastructure**: AWS (S3 + CloudFront)
+- **IaC**: Terraform
+- **CI/CD**: GitHub Actions
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Prerequisites
 
-## React Compiler
+- Node.js 24.12.0 (managed by [mise](https://mise.jdx.dev/))
+- AWS CLI (for infrastructure management)
+- Terraform (for infrastructure provisioning)
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+## Setup
 
-## Expanding the ESLint configuration
+```bash
+# Install dependencies
+npm install
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+# Copy environment variables template
+cp .env.example .env
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Edit .env and set your Google Analytics tracking ID (optional for development)
+# VITE_GA_TRACKING_ID=G-XXXXXXXXXX
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Development
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+```bash
+# Start development server (http://localhost:5173)
+# Accessible via network as well
+npm run dev
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Lint code
+npm run lint
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+## Infrastructure
+
+インフラは Terraform で管理されています。詳細は[terraform/](./terraform/)ディレクトリを参照してください。
+
+### Setup Infrastructure
+
+```bash
+cd terraform
+
+# Create terraform.tfvars and set your ACM certificate ARN
+# acm_certificate_arn = "arn:aws:acm:us-east-1:XXXXXXXXXXXX:certificate/XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+
+# Initialize Terraform
+terraform init
+
+# Plan changes
+terraform plan
+
+# Apply changes
+terraform apply
+```
+
+## Deployment
+
+main ブランチへの push で自動的にビルド・デプロイが実行されます。
+
+### Required GitHub Secrets
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `S3_BUCKET_NAME`
+- `CLOUDFRONT_DISTRIBUTION_ID`
+- `VITE_GA_TRACKING_ID`
+
+### Deployment Workflow
+
+1. Lint checks
+2. Build application
+3. Sync to S3 (with appropriate cache headers)
+4. Invalidate CloudFront cache
+
+## Architecture
+
+- **S3**: Static file hosting (public access blocked, OAC enabled)
+- **CloudFront**: CDN with custom domain support
+- **CloudFront Function**: www → non-www redirect (301)
+- **ACM**: SSL/TLS certificate (us-east-1)
+- **Cache Strategy**:
+  - Static assets (JS/CSS/images): `max-age=31536000` (1 year)
+  - index.html/JSON files: `no-cache`
+- **SPA Support**: 403/404 errors return index.html
+
+## Project Structure
+
+```
+src/
+├── components/     # React components
+├── pages/          # Page components
+├── hooks/          # Custom React hooks
+├── utils/          # Utility functions
+└── types/          # TypeScript type definitions
 ```
