@@ -10,15 +10,6 @@ export function Background() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    function resizeCanvas() {
-      if (!canvas || !ctx) return
-      const { width, height } = canvas.getBoundingClientRect()
-      canvas.width = width
-      canvas.height = height
-      generateNoise()
-      applyColorMask()
-    }
-
     function generateNoise() {
       if (!canvas || !ctx) return
       const imageData = ctx.createImageData(canvas.width, canvas.height)
@@ -38,18 +29,17 @@ export function Background() {
       ctx.globalAlpha = 1.0
     }
 
-    resizeCanvas()
-    window.addEventListener('resize', resizeCanvas)
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvas)
-    }
+    const { width, height } = canvas.getBoundingClientRect()
+    canvas.width = width
+    canvas.height = height
+    generateNoise()
+    applyColorMask()
   }, [])
 
   return (
     <canvas
       ref={canvasRef}
-      className="fixed inset-0 -z-10 block h-screen w-screen bg-background opacity-96"
+      className="fixed inset-0 -z-10 block h-screen w-screen bg-background"
       style={{
         transform: 'translate3d(0, 0, 0)',
         willChange: 'transform',
