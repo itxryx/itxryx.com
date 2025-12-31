@@ -10,6 +10,8 @@ export function Background() {
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
+    let previousWidth = window.innerWidth
+
     function generateNoise() {
       if (!canvas || !ctx) return
       const imageData = ctx.createImageData(canvas.width, canvas.height)
@@ -29,11 +31,25 @@ export function Background() {
       ctx.globalAlpha = 1.0
     }
 
-    const { width, height } = canvas.getBoundingClientRect()
-    canvas.width = width
-    canvas.height = height
-    generateNoise()
-    applyColorMask()
+    function resizeAndDraw() {
+      if (!canvas || !ctx) return
+      canvas.width = window.innerWidth
+      canvas.height = window.innerHeight
+      generateNoise()
+      applyColorMask()
+    }
+
+    function handleResize() {
+      const currentWidth = window.innerWidth
+      if (currentWidth !== previousWidth) {
+        previousWidth = currentWidth
+        resizeAndDraw()
+      }
+    }
+
+    requestAnimationFrame(resizeAndDraw)
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
 
   return (
