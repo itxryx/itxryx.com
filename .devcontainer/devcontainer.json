@@ -1,16 +1,14 @@
-  {
-    "name": "itxryx-com",
-    "build": {
-      "dockerfile": "Dockerfile"
-    },
-    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
-    "workspaceFolder": "/workspace",
-    "forwardPorts": [3000],
-    "customizations": {
-      "vscode": {
-        "extensions": [
-          "biomejs.biome"
-        ]
-      }
+{
+  "name": "itxryx-com",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [3000],
+  "customizations": {
+    "vscode": {
+      "extensions": ["biomejs.biome"]
     }
   }
+}
