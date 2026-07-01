@@ -1,0 +1,62 @@
+name: Terraform Bootstrap
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: terraform-bootstrap
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+  TF_VAR_aws_region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+  TF_VAR_state_bucket_name: ${{ vars.TF_STATE_BUCKET }}
+  TF_VAR_lock_table_name: ${{ vars.TF_LOCK_TABLE }}
+
+jobs:
+  apply:
+    name: Bootstrap Terraform Backend
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: terraform/bootstrap
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - name: Terraform format check
+        run: terraform fmt -check -recursive .
+
+      - name: Validate required variables
+        run: |
+          test -n "$TF_VAR_state_bucket_name"
+          test -n "$TF_VAR_lock_table_name"
+
+      - name: Terraform init
+        run: terraform init
+
+      - name: Terraform validate
+        run: terraform validate
+
+      - name: Terraform plan
+        run: terraform plan -out=tfplan
+
+      - name: Terraform apply
+        run: terraform apply -auto-approve tfplan
