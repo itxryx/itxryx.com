@@ -11,14 +11,11 @@ module "static_site" {
 module "www_redirect" {
   source = "../../modules/www_redirect"
 
-  domain_name              = var.domain_name
-  www_domain_name          = var.www_domain_name
-  hosted_zone_id           = var.hosted_zone_id
-  acm_certificate_arn      = var.acm_certificate_arn
-  cloudfront_price_class   = var.cloudfront_price_class
-  origin_domain_name       = module.static_site.bucket_regional_domain_name
-  origin_id                = module.static_site.origin_id
-  origin_access_control_id = module.static_site.origin_access_control_id
+  domain_name            = var.domain_name
+  www_domain_name        = var.www_domain_name
+  hosted_zone_id         = var.hosted_zone_id
+  acm_certificate_arn    = var.acm_certificate_arn
+  cloudfront_price_class = var.cloudfront_price_class
 }
 
 data "aws_iam_policy_document" "site_bucket" {
@@ -41,7 +38,6 @@ data "aws_iam_policy_document" "site_bucket" {
       variable = "AWS:SourceArn"
       values = [
         module.static_site.distribution_arn,
-        module.www_redirect.distribution_arn,
       ]
     }
   }

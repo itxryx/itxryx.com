@@ -102,7 +102,6 @@ jobs:
         run: |
           echo "site_bucket=$(terraform output -raw site_bucket_name)" >> "$GITHUB_OUTPUT"
           echo "site_distribution_id=$(terraform output -raw site_distribution_id)" >> "$GITHUB_OUTPUT"
-          echo "www_redirect_distribution_id=$(terraform output -raw www_redirect_distribution_id)" >> "$GITHUB_OUTPUT"
 
       - name: Sync static files to S3
         run: |
@@ -114,7 +113,4 @@ jobs:
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "${{ steps.terraform_outputs.outputs.site_distribution_id }}" \
-            --paths "/*"
-          aws cloudfront create-invalidation \
-            --distribution-id "${{ steps.terraform_outputs.outputs.www_redirect_distribution_id }}" \
             --paths "/*"

@@ -22,19 +22,3 @@ variable "cloudfront_price_class" {
   description = "CloudFront price class."
   type        = string
 }
-
-variable "origin_domain_name" {
-  description = "Fallback origin domain name required by CloudFront."
-  type        = string
-}
-
-variable "origin_id" {
-  description = "Fallback origin ID required by CloudFront."
-  type        = string
-}
-
-variable "origin_access_control_id" {
-  description = "CloudFront OAC ID for the fallback S3 origin."
-  type        = string
-}
-

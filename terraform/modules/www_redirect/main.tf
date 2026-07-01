@@ -37,13 +37,19 @@ resource "aws_cloudfront_distribution" "www_redirect" {
   price_class     = var.cloudfront_price_class
 
   origin {
-    domain_name              = var.origin_domain_name
-    origin_id                = var.origin_id
-    origin_access_control_id = var.origin_access_control_id
+    domain_name = var.domain_name
+    origin_id   = "redirect-origin"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2"]
+    }
   }
 
   default_cache_behavior {
-    target_origin_id       = var.origin_id
+    target_origin_id       = "redirect-origin"
     viewer_protocol_policy = "redirect-to-https"
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]

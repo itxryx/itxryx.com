@@ -8,13 +8,7 @@ output "site_distribution_id" {
   value       = module.static_site.distribution_id
 }
 
-output "www_redirect_distribution_id" {
-  description = "CloudFront distribution ID for www.itxryx.com redirects."
-  value       = module.www_redirect.distribution_id
-}
-
 output "site_url" {
   description = "Canonical site URL."
   value       = "https://${var.domain_name}"
 }
-

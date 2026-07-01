@@ -23,24 +23,6 @@ resource "aws_s3_bucket_ownership_controls" "site" {
   }
 }
 
-resource "aws_s3_bucket_versioning" "site" {
-  bucket = aws_s3_bucket.site.id
-
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "site" {
-  bucket = aws_s3_bucket.site.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
 resource "aws_cloudfront_origin_access_control" "site" {
   name                              = "${var.domain_name}-s3-oac"
   description                       = "OAC for ${var.domain_name} static site bucket"
@@ -85,12 +67,6 @@ resource "aws_cloudfront_distribution" "site" {
     response_page_path = "/404.html"
   }
 
-  custom_error_response {
-    error_code         = 404
-    response_code      = 404
-    response_page_path = "/404.html"
-  }
-
   restrictions {
     geo_restriction {
       restriction_type = "none"
@@ -127,4 +103,3 @@ resource "aws_route53_record" "site_aaaa" {
     evaluate_target_health = false
   }
 }
-
