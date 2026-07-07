@@ -4,10 +4,11 @@ import { useEffect, useRef } from "react";
 
 const noiseSettings = {
   baseColor: 51,
-  contrast: 14,
-  fineNoiseAmount: 7,
-  perlinScale: 0.0028,
-  grainScale: 0.18,
+  cloudContrast: 12,
+  cloudScale: 0.0028,
+  cloudPixelSize: 4,
+  grainTileSize: 256,
+  grainMaxAlpha: 26,
   maxPixelRatio: 2,
 };
 
@@ -76,42 +77,34 @@ function perlin(x: number, y: number) {
   return lerp(x1, x2, v);
 }
 
-function drawNoise(canvas: HTMLCanvasElement) {
+function getPixelRatio() {
+  return Math.min(window.devicePixelRatio || 1, noiseSettings.maxPixelRatio);
+}
+
+function drawClouds(canvas: HTMLCanvasElement) {
   const context = canvas.getContext("2d");
 
   if (!context) {
     return;
   }
 
-  const pixelRatio = Math.min(
-    window.devicePixelRatio || 1,
-    noiseSettings.maxPixelRatio,
-  );
-  const width = Math.ceil(window.innerWidth * pixelRatio);
-  const height = Math.ceil(window.innerHeight * pixelRatio);
+  const { baseColor, cloudContrast, cloudScale, cloudPixelSize } =
+    noiseSettings;
+  const ratio = getPixelRatio();
+  const width = Math.ceil((window.innerWidth * ratio) / cloudPixelSize);
+  const height = Math.ceil((window.innerHeight * ratio) / cloudPixelSize);
 
   canvas.width = width;
   canvas.height = height;
-  canvas.style.width = "100%";
-  canvas.style.height = "100%";
 
   const image = context.createImageData(width, height);
+  const sampleScale = cloudScale * cloudPixelSize;
 
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
-      const value =
-        perlin(x * noiseSettings.perlinScale, y * noiseSettings.perlinScale) *
-          0.35 +
-        perlin(x * noiseSettings.grainScale, y * noiseSettings.grainScale) *
-          0.65;
-      const fineNoise =
-        (((x * 12_989 + y * 78_233) * 437_585) % 1_000) / 1_000 - 0.5;
+      const value = perlin(x * sampleScale, y * sampleScale);
       const shade = clamp(
-        Math.round(
-          noiseSettings.baseColor +
-            value * noiseSettings.contrast +
-            fineNoise * noiseSettings.fineNoiseAmount,
-        ),
+        Math.round(baseColor + value * cloudContrast),
         0,
         255,
       );
@@ -127,24 +120,85 @@ function drawNoise(canvas: HTMLCanvasElement) {
   context.putImageData(image, 0, 0);
 }
 
+function createGrainTile() {
+  const { grainTileSize, grainMaxAlpha } = noiseSettings;
+  const tile = document.createElement("canvas");
+
+  tile.width = grainTileSize;
+  tile.height = grainTileSize;
+
+  const context = tile.getContext("2d");
+
+  if (!context) {
+    return tile;
+  }
+
+  const image = context.createImageData(grainTileSize, grainTileSize);
+
+  for (let index = 0; index < image.data.length; index += 4) {
+    const shade = Math.random() < 0.5 ? 0 : 255;
+
+    image.data[index] = shade;
+    image.data[index + 1] = shade;
+    image.data[index + 2] = shade;
+    image.data[index + 3] = Math.round(Math.random() * grainMaxAlpha);
+  }
+
+  context.putImageData(image, 0, 0);
+
+  return tile;
+}
+
+function drawGrain(canvas: HTMLCanvasElement, tile: HTMLCanvasElement) {
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    return;
+  }
+
+  const ratio = getPixelRatio();
+
+  canvas.width = Math.ceil(window.innerWidth * ratio);
+  canvas.height = Math.ceil(window.innerHeight * ratio);
+
+  const pattern = context.createPattern(tile, "repeat");
+
+  if (!pattern) {
+    return;
+  }
+
+  context.fillStyle = pattern;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+}
+
 export function NoiseBackground() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const cloudCanvasRef = useRef<HTMLCanvasElement>(null);
+  const grainCanvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
+    const cloudCanvas = cloudCanvasRef.current;
+    const grainCanvas = grainCanvasRef.current;
 
-    if (!canvas) {
+    if (!cloudCanvas || !grainCanvas) {
       return;
     }
+
+    const grainTile = createGrainTile();
+
+    const drawAll = () => {
+      drawClouds(cloudCanvas);
+      drawGrain(grainCanvas, grainTile);
+    };
+
+    drawAll();
 
     let resizeTimer: number;
 
     const handleResize = () => {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => drawNoise(canvas), 120);
+      resizeTimer = window.setTimeout(drawAll, 120);
     };
 
-    drawNoise(canvas);
     window.addEventListener("resize", handleResize);
 
     return () => {
@@ -154,11 +208,10 @@ export function NoiseBackground() {
   }, []);
 
   return (
-    <canvas
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 z-0 size-full bg-[#333]"
-      ref={canvasRef}
-      tabIndex={-1}
-    />
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0">
+      <canvas className="size-full bg-[#333]" ref={cloudCanvasRef} />
+      <canvas className="absolute inset-0 size-full" ref={grainCanvasRef} />
+      <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_40%,transparent_45%,rgba(0,0,0,0.35)_100%)]" />
+    </div>
   );
 }
