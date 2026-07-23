@@ -9,7 +9,7 @@ type LinkItem = {
 
 const socialLinks: LinkItem[] = [
   { label: "bsky.app", href: "https://bsky.app/profile/itxryx.com" },
-  { label: "instagram", href: "https://instagram.com/itxryx" },
+  { label: "instagram.com", href: "https://instagram.com/itxryx" },
   { label: "github.com", href: "https://github.com/itxryx" },
   { label: "x.com", href: "https://x.com/itxryx" },
 ];
