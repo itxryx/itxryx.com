@@ -16,9 +16,9 @@ const socialLinks: LinkItem[] = [
 
 function LinkSection({ title, items }: { title: string; items: LinkItem[] }) {
   return (
-    <section className="space-y-3 text-center">
+    <section className="space-y-3 text-left">
       <h2 className="text-lg font-medium">{title}</h2>
-      <ul className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-base font-medium">
+      <ul className="flex flex-col items-start gap-2 text-base font-medium">
         {items.map((item) => (
           <li key={item.href}>
             <a
@@ -77,7 +77,7 @@ export default function Home() {
       <div className="relative z-10 flex w-full max-w-xl flex-col items-center justify-center gap-12 py-12">
         <Profile />
 
-        <div className="space-y-10">
+        <div className="w-full max-w-xs space-y-10">
           <LinkSection items={socialLinks} title="Social" />
         </div>
       </div>
