@@ -41,6 +41,8 @@ next.config.ts の output: "export" と images.unoptimized: true を維持しま
 
 ## インフラとデプロイ
 
+GitHub Actions のランナーは ubuntu-24.04 に固定しています。OS バージョンの更新時はワークフローの互換性を検証します。
+
 Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap、その後は Deploy Production を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
 
 Deploy Production は main への push 時に PRODUCTION_DEPLOY_ENABLED=true の場合、または手動実行時に起動します。依存導入、Lint、ビルド、Terraform の整形検査・init・validate・plan・apply、out/ の S3 同期、CloudFront キャッシュ無効化の順に処理します。
