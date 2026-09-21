@@ -1,41 +1,58 @@
 # Repository Guidelines
 
-## Project Structure & Module Organization
+## プロジェクト構成
 
-This is a Next.js 16 portfolio project using the App Router and `src/` layout. Application routes live in `src/app/`; the main page is `src/app/page.tsx`, shared document metadata and layout are in `src/app/layout.tsx`, and global styles are in `src/app/globals.css`. Small page-local components currently live beside the route in `src/app/`, such as `current-year.tsx` and `noise-background.tsx`. Static assets belong in `public/` and are served from the site root, for example `public/me.jpeg` is available as `/me.jpeg`.
+itxryx.com は Next.js 16・React 19・TypeScript の静的ポートフォリオです。アプリと Terraform の AWS 基盤は、デプロイ時に out/ を S3 へ同期して接続します。
 
-Infrastructure as code lives in `terraform/`: `terraform/bootstrap/` creates the remote state resources, `terraform/environments/prod/` is the production root module, and reusable modules live in `terraform/modules/`. GitHub Actions workflows live in `.github/workflows/`. DevContainer configuration is in `.devcontainer/` and uses Node 24. Keep generated folders such as `node_modules/`, `.next/`, and `out/` out of version control.
+- src/app/page.tsx: メイン画面。Profile・LinkSection・SiteFooter はファイル内のコンポーネント。
+- src/app/layout.tsx: 共通レイアウトとメタデータ。globals.css: Tailwind CSS v4 とテーマ定義。
+- src/app/current-year.tsx・noise-background.tsx: クライアント側の年表示と背景描画。
+- public/: 静的アセット。public/me.jpeg は /me.jpeg で配信。
+- terraform/bootstrap/: state 用 S3 とロック用 DynamoDB の初期構築。
+- terraform/environments/prod/: 本番ルートモジュール。modules/static_site/ は S3・CloudFront、modules/www_redirect/ は www からルートドメインへの 301 リダイレクトを構成。
+- .github/workflows/: CI/CD。.devcontainer/: Node 24 の開発環境。
 
-## Build, Test, and Development Commands
+## 開発・検証コマンド
 
-- `npm run dev`: start the local Next.js development server on port `3000`.
-- `npm run build`: build the site. Because `next.config.ts` sets `output: "export"`, this emits static assets to `out/`.
-- `npm run lint`: run Biome checks for formatting and lint issues.
-- `npm run lint:fix`: run Biome checks and apply safe fixes.
-- `npm run format`: format files with Biome.
+コマンドは DevContainer の /workspace で実行します。
 
-`npm run start` currently runs `next start`, which is not the normal serving path for static export output. Prefer serving the generated `out/` directory when validating production static output.
+- npm ci: ロックファイルに従って依存関係をインストール。
+- npm run dev: ポート 3000 で開発サーバーを起動。
+- npm run build: 型チェックを含むビルドを実行し、静的ファイルを out/ に出力。
+- npm run lint: Biome による整形・Lint の検査。
+- npm run lint:fix: Biome の安全な自動修正。
+- npm run format: Biome による整形。
 
-Terraform apply and production deploys are intended to run only from GitHub Actions. Do not deploy from a local shell; use `Terraform Bootstrap` once for remote state setup and `Deploy Production` for production changes.
+npm run start は next start を実行するため、静的エクスポートの確認には使いません。本番相当の確認では out/ を静的サーバーで配信します。
 
-## Coding Style & Naming Conventions
+## コーディングと静的出力
 
-Use TypeScript, React 19, and the Next.js App Router conventions. Components and layouts use PascalCase exports where named; route files follow Next.js filenames such as `page.tsx`, `layout.tsx`, and `not-found.tsx`. Use the `@/*` alias for imports from `src/`.
+インデントはスペース 2 個とし、Biome の整形・import 整理に従います。コンポーネント名は PascalCase、ルートファイルは page.tsx・layout.tsx などの Next.js 規約に合わせます。src/ の参照には @/* エイリアスを利用できます。
 
-Biome is the formatter and linter. It uses two-space indentation, recommended React and Next.js rules, and import organization. Styling uses Tailwind CSS v4 through `@tailwindcss/postcss`, with global theme tokens in `src/app/globals.css`.
+next.config.ts の output: "export" と images.unoptimized: true を維持します。実行時サーバーが必要な cookies()・headers()・Server Actions・ISR・リクエスト依存の Route Handlers や、generateStaticParams() のない動的ルートは追加しません。
 
-## Static Site Generation Guidelines
+静的な画面構成は page.tsx に置き、Hooks が必要な処理は "use client" のコンポーネントに分離します。window・canvas などの操作は useEffect 内から行います。CurrentYear は閲覧時の年を取得するため useEffect を使用しています。Date 自体はブラウザー専用 API ではありません。
 
-This project targets static export. Do not add runtime-only features unless the deployment model changes. Avoid `cookies()`, `headers()`, Server Actions, ISR, request-dependent Route Handlers, and dynamic routes without `generateStaticParams()`. `next.config.ts` already sets `images.unoptimized: true`; prefer static files from `public/` for image assets.
+## テストと変更時の確認
 
-## Testing Guidelines
+テストフレームワーク・npm test・カバレッジ基準は未設定です。意味のあるロジックを追加する際は、用途に応じて Vitest や Playwright などの最小限の構成を導入し、renders-profile-links.test.tsx のように振る舞いを示す名前を付けます。
 
-No test framework is configured yet. When adding behavior with meaningful logic, add a focused test runner such as Vitest for unit tests or Playwright for browser flows. Name tests by behavior, for example `renders-profile-links.test.tsx`.
+変更後は npm run lint と npm run build を実行し、実行結果と終了コードを報告します。失敗を抑制せず、依頼範囲外の問題は報告します。
 
-## Commit & Pull Request Guidelines
+## インフラとデプロイ
 
-Use short, imperative commit messages such as `Add portfolio shell` or `Configure static export`. Pull requests should include a concise summary, verification commands run, and screenshots for visual changes.
+Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap、その後は Deploy Production を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
 
-## Agent-Specific Instructions
+Deploy Production は main への push 時に PRODUCTION_DEPLOY_ENABLED=true の場合、または手動実行時に起動します。依存導入、Lint、ビルド、Terraform の整形検査・init・validate・plan・apply、out/ の S3 同期、CloudFront キャッシュ無効化の順に処理します。
 
-Before editing Next.js code, check the installed version and prefer local docs or current project conventions over assumptions. Do not overwrite user changes. Keep changes narrow, update this guide when tooling or structure changes, and run `npm run lint` plus `npm run build` when available. If working outside the DevContainer, first confirm that `node` and `npm` are available.
+本番の S3 読み取り権限は AWS:SourceArn 条件で対象 CloudFront に限定します。バックエンド設定・入力値・認証情報は GitHub Actions の Variables/Secrets から渡します。必要な設定と実行手順は DEPLOYMENT_MANUAL.md を参照してください。秘密情報や node_modules/・.next/・out/ などの生成物はコミットしません。
+
+## コミットとプルリクエスト
+
+履歴にある fix:・update:・chore: などの接頭辞に合わせ、変更内容を簡潔に記述します。例: fix: styles。PR には変更の要約と検証コマンド・結果を記載し、表示変更にはスクリーンショットを添えます。
+
+## エージェントの作業方針
+
+応答は日本語で、結論から簡潔に述べます。着手前に既存コード・依存関係・影響範囲を確認し、Next.js の変更前にはインストール済みバージョンとローカルの資料を確認します。未確認事項は明示します。
+
+ユーザーの変更を上書きせず、変更を依頼範囲に限定します。削除などのリスクを伴う操作は理由・影響・安全策を事前に説明します。単純で読みやすい設計を優先し、不要な共通化やリファクタリングを避けます。構成やツールを変更した場合は、このガイドも更新します。
