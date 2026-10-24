@@ -55,7 +55,7 @@ Repository variables に以下を設定してください。
 - GitHub Actions 画面から手動実行する。
 - `main` branch へ merge または push する。
 
-workflow は mise をセットアップし、mise.toml に従って Node.js 24.22.1 と pnpm 12 系を aqua backend から導入します。pnpm の新規バージョン選択では公開後 7 日以上のリリースを対象とし、CI はコミット済みの mise.lock に記録されたバージョンを使用します。その後、次の順で実行します。
+workflow は mise をセットアップし、mise.toml に従って Node.js 26.12.1 と pnpm 12 系を aqua backend から導入します。pnpm の新規バージョン選択では公開後 7 日以上のリリースを対象とし、CI はコミット済みの mise.lock に記録されたバージョンを使用します。その後、次の順で実行します。
 
 1. `pnpm install --frozen-lockfile`
 2. `pnpm run lint`

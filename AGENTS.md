@@ -14,7 +14,7 @@ itxryx.com は Next.js 16・React 19・TypeScript の静的ポートフォリオ
 
 ## 開発・検証コマンド
 
-コマンドは DevContainer の /workspace で実行します。mise.toml の aqua:nodejs/node で Node.js を 24.22.1 に完全固定し、aqua:pnpm/pnpm で pnpm を 12 系にメジャー固定します。package.json の engines も同じ条件に揃えます。DevContainer のビルドコンテキストはリポジトリルートです。イメージビルド時に mise.toml・mise.lock を COPY し、mise trust と mise install --yes --locked を実行します。コンテナ作成後の postCreateCommand では pnpm install --frozen-lockfile のみ実行します。mise の [settings] に minimum_release_age = "7d" と lockfile = true を指定し、新規バージョン選択の待機期間と mise.lock を管理します。通常の導入は mise install --yes --locked、pnpm 自体の更新は mise lock --bump aqua:pnpm/pnpm の後に mise install --yes --locked を実行し、mise.lock もコミットしてください。
+コマンドは DevContainer の /workspace で実行します。mise.toml の aqua:nodejs/node で Node.js を 26.12.1 に完全固定し、aqua:pnpm/pnpm で pnpm を 12 系にメジャー固定します。package.json の engines も同じ条件に揃えます。DevContainer のビルドコンテキストはリポジトリルートです。イメージビルド時に mise.toml・mise.lock を COPY し、mise trust と mise install --yes --locked を実行します。コンテナ作成後の postCreateCommand では pnpm install --frozen-lockfile のみ実行します。mise の [settings] に minimum_release_age = "7d" と lockfile = true を指定し、新規バージョン選択の待機期間と mise.lock を管理します。通常の導入は mise install --yes --locked、pnpm 自体の更新は mise lock --bump aqua:pnpm/pnpm の後に mise install --yes --locked を実行し、mise.lock もコミットしてください。
 
 - pnpm install --frozen-lockfile: pnpm-lock.yaml に従って依存関係をインストール。依存更新時は pnpm add / pnpm update を使い、ロックファイルもコミット。
 - pnpm run dev: ポート 3000 で開発サーバーを起動。

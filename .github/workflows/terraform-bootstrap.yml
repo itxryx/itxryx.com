@@ -29,6 +29,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
+      - name: Setup Node.js with mise
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.18
+          install_args: aqua:nodejs/node
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v6
         with:
