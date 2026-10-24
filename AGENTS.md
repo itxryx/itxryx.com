@@ -10,22 +10,26 @@ itxryx.com は Next.js 16・React 19・TypeScript の静的ポートフォリオ
 - public/: 静的アセット。public/me.jpeg は /me.jpeg で配信。
 - terraform/bootstrap/: state 用 S3 とロック用 DynamoDB の初期構築。
 - terraform/environments/prod/: 本番ルートモジュール。modules/static_site/ は S3・CloudFront、modules/www_redirect/ は www からルートドメインへの 301 リダイレクトを構成。
-- .github/workflows/: CI/CD。.devcontainer/: Node 24 の開発環境。
+- .github/workflows/: CI/CD。.devcontainer/: mise で Node.js・pnpm を管理する開発環境。
 
 ## 開発・検証コマンド
 
-コマンドは DevContainer の /workspace で実行します。
+コマンドは DevContainer の /workspace で実行します。mise.toml の aqua:nodejs/node で Node.js を 24.22.1 に完全固定し、aqua:pnpm/pnpm で pnpm を 12 系にメジャー固定します。package.json の engines も同じ条件に揃えます。DevContainer のビルドコンテキストはリポジトリルートです。イメージビルド時に mise.toml・mise.lock を COPY し、mise trust と mise install --yes --locked を実行します。コンテナ作成後の postCreateCommand では pnpm install --frozen-lockfile のみ実行します。mise の [settings] に minimum_release_age = "7d" と lockfile = true を指定し、新規バージョン選択の待機期間と mise.lock を管理します。通常の導入は mise install --yes --locked、pnpm 自体の更新は mise lock --bump aqua:pnpm/pnpm の後に mise install --yes --locked を実行し、mise.lock もコミットしてください。
 
-- npm ci: ロックファイルに従って依存関係をインストール。
-- npm run dev: ポート 3000 で開発サーバーを起動。
-- npm run build: 型チェックを含むビルドを実行し、静的ファイルを out/ に出力。
-- npm run lint: Biome による整形・Lint の検査。
-- npm run lint:fix: Biome の安全な自動修正。
-- npm run format: Biome による整形。
+- pnpm install --frozen-lockfile: pnpm-lock.yaml に従って依存関係をインストール。依存更新時は pnpm add / pnpm update を使い、ロックファイルもコミット。
+- pnpm run dev: ポート 3000 で開発サーバーを起動。
+- pnpm run build: 型チェックを含むビルドを実行し、静的ファイルを out/ に出力。
+- pnpm run lint: Biome による整形・Lint の検査。
+- pnpm run lint:fix: Biome の安全な自動修正。
+- pnpm run format: Biome による整形。
 
-npm run start は next start を実行するため、静的エクスポートの確認には使いません。本番相当の確認では out/ を静的サーバーで配信します。
+pnpm run start は next start を実行するため、静的エクスポートの確認には使いません。本番相当の確認では out/ を静的サーバーで配信します。
+
+ロックファイルは必ず対応するツールのコマンドで生成・更新し、手動編集やスクリプトによる内容の書き換えは禁止します。mise.lock は mise lock、pnpm-lock.yaml は pnpm install --lockfile-only・pnpm add・pnpm update などを使用します。不要なエントリの削除や競合解消も、設定ファイルを修正してからツールで再生成してください。
 
 ## コーディングと静的出力
+
+依存パッケージのインストールスクリプトは pnpm-workspace.yaml の allowBuilds で個別に許可します。
 
 インデントはスペース 2 個とし、Biome の整形・import 整理に従います。コンポーネント名は PascalCase、ルートファイルは page.tsx・layout.tsx などの Next.js 規約に合わせます。src/ の参照には @/* エイリアスを利用できます。
 
@@ -35,9 +39,9 @@ next.config.ts の output: "export" と images.unoptimized: true を維持しま
 
 ## テストと変更時の確認
 
-テストフレームワーク・npm test・カバレッジ基準は未設定です。意味のあるロジックを追加する際は、用途に応じて Vitest や Playwright などの最小限の構成を導入し、renders-profile-links.test.tsx のように振る舞いを示す名前を付けます。
+テストフレームワーク・pnpm test・カバレッジ基準は未設定です。意味のあるロジックを追加する際は、用途に応じて Vitest や Playwright などの最小限の構成を導入し、renders-profile-links.test.tsx のように振る舞いを示す名前を付けます。
 
-変更後は npm run lint と npm run build を実行し、実行結果と終了コードを報告します。失敗を抑制せず、依頼範囲外の問題は報告します。
+変更後は pnpm run lint と pnpm run build を実行し、実行結果と終了コードを報告します。失敗を抑制せず、依頼範囲外の問題は報告します。
 
 ## インフラとデプロイ
 

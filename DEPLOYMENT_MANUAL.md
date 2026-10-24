@@ -55,11 +55,11 @@ Repository variables に以下を設定してください。
 - GitHub Actions 画面から手動実行する。
 - `main` branch へ merge または push する。
 
-workflow は次の順で実行します。
+workflow は mise をセットアップし、mise.toml に従って Node.js 24.22.1 と pnpm 12 系を aqua backend から導入します。pnpm の新規バージョン選択では公開後 7 日以上のリリースを対象とし、CI はコミット済みの mise.lock に記録されたバージョンを使用します。その後、次の順で実行します。
 
-1. `npm ci`
-2. `npm run lint`
-3. `npm run build`
+1. `pnpm install --frozen-lockfile`
+2. `pnpm run lint`
+3. `pnpm run build`
 4. Terraform init / validate / plan / apply
 5. `out/` を S3 bucket へ sync
 6. `itxryx.com` の CloudFront distribution を invalidation
@@ -83,7 +83,7 @@ workflow は次の順で実行します。
 
 workflow の既定値 `G-XXXXXXXXXX` はプレイスホルダーです。変数が未設定または空の場合はこの値でタグが生成され、ビルドも成功しますが、対象の GA4 プロパティでは計測できません。
 
-ローカルで測定 ID を指定せずにビルドした場合、および `npm run dev` では計測タグを出力しません。設定値が `G-` と半角英大文字・数字の形式でない場合はエラーになります。
+ローカルで測定 ID を指定せずにビルドした場合、および `pnpm run dev` では計測タグを出力しません。設定値が `G-` と半角英大文字・数字の形式でない場合はエラーになります。
 
 本番の計測を停止する場合は、workflow のフォールバック `|| 'G-XXXXXXXXXX'` と GitHub Variables の測定 ID を両方削除して再デプロイします。変数の削除だけではタグは無効になりません。
 

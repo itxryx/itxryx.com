@@ -1,10 +1,12 @@
 {
   "name": "itxryx-com",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "context": ".."
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
   "workspaceFolder": "/workspace",
+  "postCreateCommand": "pnpm install --frozen-lockfile",
   "forwardPorts": [3000],
   "customizations": {
     "vscode": {

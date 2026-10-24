@@ -1,36 +1,40 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# itxryx.com
 
-## Getting Started
+Next.js・React・TypeScript による静的ポートフォリオです。
 
-First, run the development server:
+## 開発環境
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+Node.js と pnpm は mise の aqua backend で管理します。mise.toml で Node.js は 24.22.1 に完全固定、pnpm は 12 系にメジャー固定しています。package.json の engines にも同じバージョン条件を指定しています。pnpm の新規バージョン選択では公開後 7 日以上経過したリリースを対象にし、解決したバージョンとチェックサムを mise.lock に保存します。
+
+DevContainer のイメージビルド時に mise.toml・mise.lock を /workspace に COPY し、mise trust と mise install --yes --locked で Node.js・pnpm を導入します。コンテナ作成後は postCreateCommand で pnpm install --frozen-lockfile を実行し、依存をインストールします。コマンドはコンテナ内の /workspace で実行してください。
+
+```sh
+pnpm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+http://localhost:3000 で表示を確認できます。メイン画面は src/app/page.tsx です。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+セットアップを再実行する場合:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```sh
+mise trust
+mise install --yes --locked
+pnpm install --frozen-lockfile
+```
 
-## Learn More
+pnpm 自体の更新は mise lock --bump aqua:pnpm/pnpm でロックを更新し、mise install --yes --locked で適用します。mise.lock もコミットしてください。
 
-To learn more about Next.js, take a look at the following resources:
+依存の追加・更新には pnpm add / pnpm update を使い、pnpm-lock.yaml もコミットしてください。依存パッケージのインストールスクリプトは pnpm-workspace.yaml の allowBuilds で個別に許可します。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 検証
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```sh
+pnpm run lint
+pnpm run build
+```
 
-## Deploy on Vercel
+ビルド結果は out/ に出力されます。静的出力の確認には out/ を配信する静的サーバーを使用してください。
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## デプロイ
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+GitHub Actions から AWS S3 + CloudFront へデプロイします。設定と実行手順は DEPLOYMENT_MANUAL.md を参照してください。

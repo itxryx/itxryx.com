@@ -1,0 +1,7 @@
+[tools]
+"aqua:nodejs/node" = "24.22.1"
+"aqua:pnpm/pnpm" = "12"
+
+[settings]
+minimum_release_age = "7d"
+lockfile = true

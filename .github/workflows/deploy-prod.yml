@@ -42,22 +42,31 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
+      - name: Setup Node.js and pnpm with mise
+        uses: jdx/mise-action@v5
         with:
-          node-version: 24
-          cache: npm
+          version: 2026.10.18
+
+      - name: Get pnpm store path
+        id: pnpm-store
+        run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache pnpm store
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.pnpm-store.outputs.path }}
+          key: ${{ runner.os }}-${{ runner.arch }}-pnpm12-${{ hashFiles('pnpm-lock.yaml') }}
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: npm run lint
+        run: pnpm run lint
 
       - name: Build static export
         env:
           NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-XXXXXXXXXX' }}
-        run: npm run build
+        run: pnpm run build
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
