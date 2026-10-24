@@ -35,6 +35,7 @@ Repository variables に以下を設定してください。
 | `ACM_CERTIFICATE_ARN` | `arn:aws:acm:us-east-1:...:certificate/...` | Yes |
 | `SITE_BUCKET_NAME` | `itxryx-com-prod-site` | Yes |
 | `PRODUCTION_DEPLOY_ENABLED` | `true` | No |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | `G-XXXXXXXXXX` | Yes（GA4 の計測に必要。実際の測定 ID を設定） |
 
 `TF_STATE_BUCKET` と `SITE_BUCKET_NAME` はグローバルに一意な S3 bucket 名にしてください。
 
@@ -69,3 +70,23 @@ workflow は次の順で実行します。
 - `https://www.itxryx.com/` が `https://itxryx.com/` に 301 redirect されること。
 - `https://itxryx.com/me.jpeg` などの静的アセットが表示されること。
 - 存在しない URL が 404 として扱われること。
+
+## 7. Google Analytics 4
+
+本番デプロイでは GitHub Variables の `NEXT_PUBLIC_GA_MEASUREMENT_ID` を使用します。次の手順で実際の測定 ID を登録してください。登録済みの場合は再登録不要です。
+
+1. Google Analytics で対象の GA4 プロパティと `https://itxryx.com` のウェブデータストリームを用意します。
+2. 管理画面の「データ ストリーム」から対象ストリームを開き、`G-` で始まる測定 ID をコピーします。
+3. GitHub の Settings → Secrets and variables → Actions → Variables に、`NEXT_PUBLIC_GA_MEASUREMENT_ID` を登録します。測定 ID は公開される識別子です。
+4. `Deploy Production` workflow で再ビルド・デプロイします。ID はビルド時に静的ファイルへ埋め込まれるため、登録・変更時も再デプロイが必要です。
+5. 本番サイトを開き、Google Analytics のリアルタイムレポートでアクセスを確認します。ブラウザーの Network でも `gtag/js` の読み込みと `g/collect` の送信を確認できます。
+
+workflow の既定値 `G-XXXXXXXXXX` はプレイスホルダーです。変数が未設定または空の場合はこの値でタグが生成され、ビルドも成功しますが、対象の GA4 プロパティでは計測できません。
+
+ローカルで測定 ID を指定せずにビルドした場合、および `npm run dev` では計測タグを出力しません。設定値が `G-` と半角英大文字・数字の形式でない場合はエラーになります。
+
+本番の計測を停止する場合は、workflow のフォールバック `|| 'G-XXXXXXXXXX'` と GitHub Variables の測定 ID を両方削除して再デプロイします。変数の削除だけではタグは無効になりません。
+
+ページ表示は Google タグの自動計測を使用します。手動の `page_view` 送信を追加すると二重計測になるため、追加しないでください。
+
+公式資料: [測定 ID の確認](https://support.google.com/analytics/answer/9539598?hl=ja)、[ページビューの計測](https://developers.google.com/analytics/devguides/collection/ga4/views)。

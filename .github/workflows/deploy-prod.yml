@@ -55,6 +55,8 @@ jobs:
         run: npm run lint
 
       - name: Build static export
+        env:
+          NEXT_PUBLIC_GA_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-XXXXXXXXXX' }}
         run: npm run build
 
       - name: Setup Terraform
