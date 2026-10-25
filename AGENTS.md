@@ -47,9 +47,11 @@ next.config.ts の output: "export" と images.unoptimized: true を維持しま
 
 GitHub Actions のランナーは ubuntu-24.04 に固定しています。OS バージョンの更新時はワークフローの互換性を検証します。
 
-Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap、その後は Deploy Production を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
+Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap で state 用リソースを作成し、Terraform Production で本番インフラを構築します。サイト公開には Deploy Production を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
 
-Deploy Production は main への push 時に PRODUCTION_DEPLOY_ENABLED=true の場合、または手動実行時に起動します。依存導入、Lint、ビルド、Terraform の整形検査・init・validate・plan・apply、out/ の S3 同期、CloudFront キャッシュ無効化の順に処理します。
+Terraform Production は main からの手動実行専用で、既定では plan のみ実行します。apply=true の場合は terraform-production Environment の承認後に、同じコミット・保存済み plan・Provider lock を使って適用します。承認待ちには GitHub 側の Required reviewers 設定が必要です。plan の Artifact は1日間保存します。
+
+Deploy Production は main への push 時に PRODUCTION_DEPLOY_ENABLED=true の場合、または手動実行時に起動します。依存導入、Lint、ビルド、Terraform init・output による既存 state からの配信先取得、out/ の S3 同期、CloudFront キャッシュ無効化の順に処理し、plan・apply は実行しません。Terraform Production と同じ concurrency group を使用します。CI は独立して起動し、現段階では Deploy Production は CI の完了を待ちません。
 
 本番の S3 読み取り権限は AWS:SourceArn 条件で対象 CloudFront に限定します。バックエンド設定・入力値・認証情報は GitHub Actions の Variables/Secrets から渡します。必要な設定と実行手順は DEPLOYMENT_MANUAL.md を参照してください。秘密情報や node_modules/・.next/・out/ などの生成物はコミットしません。
 

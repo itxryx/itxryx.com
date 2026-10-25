@@ -35,6 +35,22 @@ pnpm run build
 
 ビルド結果は out/ に出力されます。静的出力の確認には out/ を配信する静的サーバーを使用してください。
 
+## CI
+
+`.github/workflows/ci.yml` は PR と main への push で実行されます。AWS 認証や `PRODUCTION_DEPLOY_ENABLED` の設定は不要です。
+
+- `App`: 依存導入、Lint、静的ビルド。
+- `Terraform (bootstrap)` / `Terraform (prod)`: 整形検査、`terraform init -backend=false -input=false`、`terraform validate`。plan・apply は実行しません。
+- `Workflows`: actionlint 1.7.12 で全 Workflow を検査。
+
+ブランチ保護で CI を必須にする場合は、初回実行後に上記4つのチェックを登録してください。ブランチ保護は GitHub 側で別途設定します。
+
 ## デプロイ
 
-GitHub Actions から AWS S3 + CloudFront へデプロイします。設定と実行手順は DEPLOYMENT_MANUAL.md を参照してください。
+GitHub Actions から AWS S3 + CloudFront へデプロイします。
+
+- `Terraform Bootstrap`: state 用リソースの初期構築。手動実行専用。
+- `Terraform Production`: 本番インフラの変更。main からの手動実行専用で、既定では plan のみ実行します。適用には `apply=true` を指定し、`terraform-production` Environment の承認設定を使用します。
+- `Deploy Production`: サイトのビルド・公開。Terraform apply は実行せず、既存 state から配信先を取得します。
+
+main への push では CI と、自動公開が有効な場合の Deploy Production が独立して起動します。承認設定と移行手順は DEPLOYMENT_MANUAL.md を参照してください。

@@ -39,39 +39,76 @@ Repository variables に以下を設定してください。
 
 `TF_STATE_BUCKET` と `SITE_BUCKET_NAME` はグローバルに一意な S3 bucket 名にしてください。
 
-`PRODUCTION_DEPLOY_ENABLED` は初回 bootstrap が完了するまで未設定または `false` にしてください。`true` にすると、`main` branch への push / merge で `Deploy Production` workflow が自動実行されます。手動実行の場合は、この値に関係なく `Deploy Production` workflow を実行できます。
+`PRODUCTION_DEPLOY_ENABLED` は初回の本番インフラ構築が完了するまで未設定または `false` にしてください。`true` にすると、`main` branch への push / merge で `Deploy Production` workflow が自動実行されます。手動実行の場合は、この値に関係なく `Deploy Production` workflow を実行できます。`Terraform Production` の実行条件には影響しません。
 
-## 4. 初回 Bootstrap
+## 4. Terraform 適用の承認設定
+
+GitHub の Settings → Environments に `terraform-production` を作成し、次を設定してください。
+
+- Deployment branches and tags: `main` branch のみを許可。
+- Required reviewers: plan を確認する担当者を登録。
+
+Environment を YAML に指定するだけでは承認待ちになりません。Required reviewers が未設定の場合、`apply=true` の実行は plan 成功後にそのまま apply に進みます。承認設定を完了するまでは `apply=false` で plan のみ実行してください。Required reviewers の利用可否は GitHub のプランとリポジトリの公開範囲に依存します。
+
+単独運用で自分が実行・承認する場合は Prevent self-review を有効にしないでください。AWS 認証と Terraform の入力値は引き続き Repository secrets / variables を使用し、この Environment には同名の上書き設定を追加しないでください。
+
+公式資料: [Deployment protection rules](https://docs.github.com/en/actions/reference/workflows-and-actions/deployments-and-environments)。
+
+## 5. 初回 Bootstrap
 
 1. GitHub Actions の `Terraform Bootstrap` workflow を手動実行します。
 2. `TF_STATE_BUCKET` の S3 bucket と `TF_LOCK_TABLE` の DynamoDB table が作成されたことを確認します。
-3. Repository variable の `PRODUCTION_DEPLOY_ENABLED` を `true` にします。
-4. この workflow は初回作成用です。作成後に繰り返し実行すると、既存リソースとの競合で失敗する可能性があります。
+3. 次節の `Terraform Production` で本番インフラを構築します。
+4. `Deploy Production` を手動実行してサイトの公開を確認し、Repository variable の `PRODUCTION_DEPLOY_ENABLED` を `true` にします。
 
-## 5. 本番 Deploy
+`Terraform Bootstrap` は初回作成用です。作成後に繰り返し実行すると、既存リソースとの競合で失敗する可能性があります。既に構築済みの場合は再実行不要です。
+
+## 6. 本番インフラの変更
+
+`.github/workflows/terraform-prod.yml` の `Terraform Production` を手動実行します。対象 branch は `main` のみで、それ以外は job がスキップされます。サイトのビルド・配信は実行しません。
+
+1. Terraform の変更を main にマージし、CI の成功を確認します。サイト側も同時に変更する場合は、マージ前に `PRODUCTION_DEPLOY_ENABLED=false` にします。
+2. plan のみ確認する場合は、`apply` を未選択（既定値 `false`）で実行します。
+3. 適用する場合は、承認設定を確認したうえで `apply=true` で実行します。
+4. `Terraform Plan` job が整形検査、init、validate、plan を実行します。Summary に対象コミット SHA と plan が表示されます。
+5. 今回の実行の plan を確認し、Review deployments で `terraform-production` を承認します。内容が想定と異なる場合は承認せず実行をキャンセルします。
+6. `Terraform Apply` job が同じコミット、保存済み plan、同じ Provider バージョンを使って適用します。配信先などの outputs は job のログに表示されます。
+7. サイトの更新も必要な場合は、インフラ適用成功後に `Deploy Production` を実行します。自動公開を停止していた場合は、確認後に `PRODUCTION_DEPLOY_ENABLED=true` に戻します。
+
+plan と apply は同じ Workflow 実行内で受け渡します。過去の plan-only 実行をそのまま適用する機能はありません。`apply=true` の実行で生成された plan を改めて確認してください。
+
+plan と Provider lock は Artifact ID を指定して受け渡し、保存期間は1日です。plan には state や機密値が含まれる場合があるため、Artifact を外部へ共有しないでください。期限切れや state 更新によって適用できない場合は、Workflow 全体を新しく実行して plan から確認し直してください。
+
+`Terraform Production` と `Deploy Production` は共通の concurrency group を使用し、同時に実行しません。承認待ちの間もサイト公開が待機するため、不要な実行はキャンセルしてください。Bootstrap は初期構築専用で、この排他制御の対象外です。
+
+## 7. サイトの公開
 
 以下のどちらかで `Deploy Production` workflow が実行されます。
 
 - GitHub Actions 画面から手動実行する。
-- `main` branch へ merge または push する。
+- `PRODUCTION_DEPLOY_ENABLED=true` の状態で `main` branch へ merge または push する。
 
 workflow は mise をセットアップし、mise.toml に従って Node.js 26.12.1 と pnpm 12 系を aqua backend から導入します。pnpm の新規バージョン選択では公開後 7 日以上のリリースを対象とし、CI はコミット済みの mise.lock に記録されたバージョンを使用します。その後、次の順で実行します。
 
 1. `pnpm install --frozen-lockfile`
 2. `pnpm run lint`
 3. `pnpm run build`
-4. Terraform init / validate / plan / apply
+4. Terraform init / output で既存 state から配信先を取得
 5. `out/` を S3 bucket へ sync
 6. `itxryx.com` の CloudFront distribution を invalidation
 
-## 6. 確認項目
+本番インフラの作成・変更は `Terraform Production` で先に実施してください。`Deploy Production` は Terraform plan / apply を実行しません。配信先の取得には、移行期間中は引き続き既存の Terraform backend 設定を使用します。
+
+この段階では main への push で `CI` と `Deploy Production` が別々に起動します。`Deploy Production` は `CI` の成功待ちをせず、自身の Lint・ビルド成功後に公開します。
+
+## 8. 確認項目
 
 - `https://itxryx.com/` が表示されること。
 - `https://www.itxryx.com/` が `https://itxryx.com/` に 301 redirect されること。
 - `https://itxryx.com/me.jpeg` などの静的アセットが表示されること。
 - 存在しない URL が 404 として扱われること。
 
-## 7. Google Analytics 4
+## 9. Google Analytics 4
 
 本番デプロイでは GitHub Variables の `NEXT_PUBLIC_GA_MEASUREMENT_ID` を使用します。次の手順で実際の測定 ID を登録してください。登録済みの場合は再登録不要です。
 
