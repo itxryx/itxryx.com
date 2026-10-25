@@ -2,45 +2,54 @@ name: Terraform Bootstrap
 
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Manage saved state, create new resources, or adopt existing resources
+        type: choice
+        options: [manage, create, adopt]
+        default: manage
+      apply:
+        description: Apply the plan after approval in terraform-production
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: terraform-bootstrap
+  group: deploy-production
   cancel-in-progress: false
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+  BOOTSTRAP_MODE: ${{ inputs.mode }}
+  TF_IN_AUTOMATION: "true"
+  TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+  TF_LOCK_TABLE: ${{ vars.TF_LOCK_TABLE }}
+  TF_STATE_KEY: ${{ vars.TF_STATE_KEY || 'itxryx.com/prod/terraform.tfstate' }}
+  TF_BOOTSTRAP_STATE_KEY: ${{ vars.TF_BOOTSTRAP_STATE_KEY || 'itxryx.com/bootstrap/terraform.tfstate' }}
   TF_VAR_aws_region: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
   TF_VAR_state_bucket_name: ${{ vars.TF_STATE_BUCKET }}
   TF_VAR_lock_table_name: ${{ vars.TF_LOCK_TABLE }}
+  TF_VAR_import_existing: ${{ inputs.mode == 'adopt' }}
+
+defaults:
+  run:
+    working-directory: terraform/bootstrap
 
 jobs:
-  apply:
-    name: Bootstrap Terraform Backend
+  plan:
+    name: Bootstrap Plan
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-
-    defaults:
-      run:
-        working-directory: terraform/bootstrap
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
-
-      - name: Setup Node.js with mise
-        uses: jdx/mise-action@v5
         with:
-          version: 2026.10.18
-          install_args: aqua:nodejs/node
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          ref: ${{ github.sha }}
 
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
@@ -50,19 +59,102 @@ jobs:
       - name: Terraform format check
         run: terraform fmt -check -recursive .
 
-      - name: Validate required variables
-        run: |
-          test -n "$TF_VAR_state_bucket_name"
-          test -n "$TF_VAR_lock_table_name"
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check backend prerequisites
+        run: bash ../../scripts/bootstrap-backend.sh check
 
       - name: Terraform init
-        run: terraform init
+        run: bash ../../scripts/bootstrap-backend.sh init
 
       - name: Terraform validate
         run: terraform validate
 
       - name: Terraform plan
-        run: terraform plan -out=tfplan
+        run: terraform plan -input=false -lock-timeout=5m -out=tfplan
 
-      - name: Terraform apply
-        run: terraform apply -auto-approve tfplan
+      - name: Summarize plan
+        run: |
+          terraform show -no-color tfplan > tfplan.txt
+          {
+            printf 'Commit: %s\nMode: %s\n\n' "$GITHUB_SHA" "$BOOTSTRAP_MODE"
+            printf '```text\n'
+            cat tfplan.txt
+            printf '\n```\n'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Save plan and provider lock
+        id: upload
+        if: inputs.apply
+        uses: actions/upload-artifact@v7
+        with:
+          name: bootstrap-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            terraform/bootstrap/tfplan
+            terraform/bootstrap/.terraform.lock.hcl
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    name: Bootstrap Apply
+    needs: plan
+    if: github.ref == 'refs/heads/main' && inputs.apply
+    runs-on: ubuntu-24.04
+    environment: terraform-production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_version: 1.10.5
+
+      - name: Download plan and provider lock
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.plan.outputs.artifact_id }}
+          path: terraform/bootstrap
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Check backend prerequisites
+        run: bash ../../scripts/bootstrap-backend.sh check
+
+      - name: Terraform init with planned provider versions
+        run: bash ../../scripts/bootstrap-backend.sh init -lockfile=readonly
+
+      - name: Apply saved plan
+        run: terraform apply -input=false -lock-timeout=5m tfplan
+
+      - name: Preserve local state for recovery
+        if: always() && inputs.mode == 'create'
+        uses: actions/upload-artifact@v7
+        with:
+          name: bootstrap-recovery-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            terraform/bootstrap/terraform.tfstate
+            terraform/bootstrap/terraform.tfstate.backup
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Migrate initial state to S3
+        if: inputs.mode == 'create'
+        run: bash ../../scripts/bootstrap-backend.sh migrate
+
+      - name: Show backend outputs
+        run: terraform output

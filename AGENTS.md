@@ -39,7 +39,7 @@ next.config.ts の output: "export" と images.unoptimized: true を維持しま
 
 ## テストと変更時の確認
 
-公開後チェックは scripts/verify-site.mjs に実装し、Node.js 標準のテストランナーで検証します。`node --test scripts/verify-site.test.mjs` はローカル HTTP サーバーを使うため、AWS 認証は不要です。アプリ用テストフレームワーク・pnpm test・カバレッジ基準は未設定です。
+公開後チェックは scripts/verify-site.mjs、Bootstrap の backend 操作は scripts/bootstrap-backend.sh に実装しています。`node --test scripts/*.test.mjs` は Node.js 標準のテストランナーを使い、HTTP サーバーや AWS CLI・Terraform のモックで検証するため、AWS 認証は不要です。CI は ShellCheck でも Bootstrap スクリプトを検査します。アプリ用テストフレームワーク・pnpm test・カバレッジ基準は未設定です。
 
 変更後は pnpm run lint と pnpm run build を実行し、実行結果と終了コードを報告します。失敗を抑制せず、依頼範囲外の問題は報告します。
 
@@ -49,11 +49,13 @@ GitHub Actions のランナーは ubuntu-24.04 に固定しています。OS バ
 
 Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap で state 用リソースを作成し、Terraform Production で本番インフラを構築します。サイト公開には Deploy Site を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
 
+Terraform Bootstrap は main からの手動実行専用です。mode は create（新規作成）、adopt（既存リソースの取り込み）、manage（保存済み state の管理）で、既定は manage・apply=false です。Bootstrap 自身の state は TF_BOOTSTRAP_STATE_KEY で本番と別の S3 キーに保存します。初回 create は local backend から移行し、復旧用 state を Artifact に7日間保存します。バケット・ロックテーブルは prevent_destroy で保護し、既存 state を上書きしません。元の state が利用できる場合は import より移行を優先してください。
+
 Terraform Production は main からの手動実行専用で、既定では plan のみ実行します。apply=true の場合は terraform-production Environment の承認後に、同じコミット・保存済み plan・Provider lock を使って適用します。承認待ちには GitHub 側の Required reviewers 設定が必要です。plan の Artifact は1日間保存します。
 
 CI は PR と main への push で検証・ビルドし、main の out/ を7日間 Artifact として保存します。Deploy Site は main の push に対する CI 成功後、PRODUCTION_DEPLOY_ENABLED=true の場合にその成果物を公開します。手動公開は main のみで、同じ CI を再利用します。ビルドには AWS 認証を渡しません。
 
-Deploy Site は SITE_BUCKET_NAME・SITE_DISTRIBUTION_ID で指定した配信先を使用し、Terraform は実行しません。公開前に対象 SHA が main の最新か確認し、S3 同期、CloudFront の無効化と完了待機、ページ・画像・www 転送・404 の検証を行います。Terraform Production と同じ concurrency group を使用します。
+Deploy Site は SITE_BUCKET_NAME・SITE_DISTRIBUTION_ID で指定した配信先を使用し、Terraform は実行しません。公開前に対象 SHA が main の最新か確認し、S3 同期、CloudFront の無効化と完了待機、ページ・画像・www 転送・404 の検証を行います。Terraform Bootstrap・Terraform Production と同じ concurrency group を使用します。
 
 本番の S3 読み取り権限は AWS:SourceArn 条件で対象 CloudFront に限定します。バックエンド設定・入力値・認証情報は GitHub Actions の Variables/Secrets から渡します。必要な設定と実行手順は DEPLOYMENT_MANUAL.md を参照してください。秘密情報や node_modules/・.next/・out/ などの生成物はコミットしません。
 

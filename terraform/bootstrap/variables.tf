@@ -14,3 +14,9 @@ variable "lock_table_name" {
   type        = string
 }
 
+variable "import_existing" {
+  description = "Import existing backend resources when their original state is unavailable."
+  type        = bool
+  default     = false
+}
+
