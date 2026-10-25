@@ -39,7 +39,7 @@ next.config.ts の output: "export" と images.unoptimized: true を維持しま
 
 ## テストと変更時の確認
 
-テストフレームワーク・pnpm test・カバレッジ基準は未設定です。意味のあるロジックを追加する際は、用途に応じて Vitest や Playwright などの最小限の構成を導入し、renders-profile-links.test.tsx のように振る舞いを示す名前を付けます。
+公開後チェックは scripts/verify-site.mjs に実装し、Node.js 標準のテストランナーで検証します。`node --test scripts/verify-site.test.mjs` はローカル HTTP サーバーを使うため、AWS 認証は不要です。アプリ用テストフレームワーク・pnpm test・カバレッジ基準は未設定です。
 
 変更後は pnpm run lint と pnpm run build を実行し、実行結果と終了コードを報告します。失敗を抑制せず、依頼範囲外の問題は報告します。
 
@@ -47,11 +47,13 @@ next.config.ts の output: "export" と images.unoptimized: true を維持しま
 
 GitHub Actions のランナーは ubuntu-24.04 に固定しています。OS バージョンの更新時はワークフローの互換性を検証します。
 
-Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap で state 用リソースを作成し、Terraform Production で本番インフラを構築します。サイト公開には Deploy Production を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
+Terraform apply と本番デプロイは GitHub Actions からのみ実行します。初回は Terraform Bootstrap で state 用リソースを作成し、Terraform Production で本番インフラを構築します。サイト公開には Deploy Site を使用し、DevContainer を含むローカルから実 AWS への apply・S3 同期は行いません。
 
 Terraform Production は main からの手動実行専用で、既定では plan のみ実行します。apply=true の場合は terraform-production Environment の承認後に、同じコミット・保存済み plan・Provider lock を使って適用します。承認待ちには GitHub 側の Required reviewers 設定が必要です。plan の Artifact は1日間保存します。
 
-Deploy Production は main への push 時に PRODUCTION_DEPLOY_ENABLED=true の場合、または手動実行時に起動します。依存導入、Lint、ビルド、Terraform init・output による既存 state からの配信先取得、out/ の S3 同期、CloudFront キャッシュ無効化の順に処理し、plan・apply は実行しません。Terraform Production と同じ concurrency group を使用します。CI は独立して起動し、現段階では Deploy Production は CI の完了を待ちません。
+CI は PR と main への push で検証・ビルドし、main の out/ を7日間 Artifact として保存します。Deploy Site は main の push に対する CI 成功後、PRODUCTION_DEPLOY_ENABLED=true の場合にその成果物を公開します。手動公開は main のみで、同じ CI を再利用します。ビルドには AWS 認証を渡しません。
+
+Deploy Site は SITE_BUCKET_NAME・SITE_DISTRIBUTION_ID で指定した配信先を使用し、Terraform は実行しません。公開前に対象 SHA が main の最新か確認し、S3 同期、CloudFront の無効化と完了待機、ページ・画像・www 転送・404 の検証を行います。Terraform Production と同じ concurrency group を使用します。
 
 本番の S3 読み取り権限は AWS:SourceArn 条件で対象 CloudFront に限定します。バックエンド設定・入力値・認証情報は GitHub Actions の Variables/Secrets から渡します。必要な設定と実行手順は DEPLOYMENT_MANUAL.md を参照してください。秘密情報や node_modules/・.next/・out/ などの生成物はコミットしません。
 

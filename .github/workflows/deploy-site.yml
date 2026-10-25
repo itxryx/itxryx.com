@@ -1,0 +1,151 @@
+name: Deploy Site
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and Validate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy and Verify
+    needs: build
+    if: >-
+      !cancelled() &&
+      ((github.event_name == 'workflow_dispatch' &&
+        github.ref == 'refs/heads/main' && needs.build.result == 'success') ||
+       (github.event_name == 'workflow_run' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        vars.PRODUCTION_DEPLOY_ENABLED == 'true'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-1' }}
+      SITE_BUCKET_NAME: ${{ vars.SITE_BUCKET_NAME }}
+      SITE_DISTRIBUTION_ID: ${{ vars.SITE_DISTRIBUTION_ID }}
+      DOMAIN_NAME: ${{ vars.DOMAIN_NAME || 'itxryx.com' }}
+      WWW_DOMAIN_NAME: ${{ vars.WWW_DOMAIN_NAME || 'www.itxryx.com' }}
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+    steps:
+      - name: Validate required variables
+        run: |
+          test -n "$SITE_BUCKET_NAME"
+          test -n "$SITE_DISTRIBUTION_ID"
+
+      - name: Checkout verified commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          persist-credentials: false
+
+      - name: Find CI static export
+        id: ci-artifact
+        if: github.event_name == 'workflow_run'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ github.event.workflow_run.id }}
+          SOURCE_RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+        shell: bash
+        run: |
+          artifact_id=$(gh api --paginate \
+            "repos/$GITHUB_REPOSITORY/actions/runs/$SOURCE_RUN_ID/artifacts" |
+            jq -s -r --arg prefix "site-$DEPLOY_SHA-" --argjson attempt "$SOURCE_RUN_ATTEMPT" '
+              [.[].artifacts[]
+                | select(.expired == false)
+                | select(.name | startswith($prefix))
+                | . + {attempt: (.name | ltrimstr($prefix) | tonumber)}
+                | select(.attempt <= $attempt)]
+              | max_by(.attempt).id // empty')
+          test -n "$artifact_id"
+          echo "artifact_id=$artifact_id" >> "$GITHUB_OUTPUT"
+
+      - name: Download CI static export
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ steps.ci-artifact.outputs.artifact_id }}
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: out
+
+      - name: Download manual build static export
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.build.outputs.artifact_id }}
+          path: out
+
+      - name: Validate static export
+        run: |
+          test -s out/index.html
+          test -s out/404.html
+          test -s out/me.jpeg
+
+      - name: Setup Node.js with mise
+        uses: jdx/mise-action@v5
+        with:
+          version: 2026.10.18
+          install_args: --locked aqua:nodejs/node
+
+      - name: Check deployment commit is current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          current_sha=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')
+          if [ "$DEPLOY_SHA" != "$current_sha" ]; then
+            echo "::error::main has advanced. Deploy the latest successful CI run."
+            exit 1
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Sync static files to S3
+        run: |
+          aws s3 sync out/ "s3://$SITE_BUCKET_NAME/" \
+            --delete \
+            --cache-control "public, max-age=300"
+
+      - name: Invalidate CloudFront cache and wait
+        run: |
+          invalidation_id=$(aws cloudfront create-invalidation \
+            --distribution-id "$SITE_DISTRIBUTION_ID" \
+            --paths "/*" \
+            --query 'Invalidation.Id' --output text)
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$SITE_DISTRIBUTION_ID" \
+            --id "$invalidation_id"
+
+      - name: Verify published site
+        run: node scripts/verify-site.mjs
+
+      - name: Summarize deployment
+        run: |
+          {
+            printf 'Commit: %s\n\n' "$DEPLOY_SHA"
+            printf 'Site: https://%s/\n\n' "$DOMAIN_NAME"
+            printf 'Publication checks passed.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
